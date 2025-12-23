@@ -77,10 +77,26 @@ type StatusLine struct {
 
 type Response struct {
 	StatusLine
+	Headers map[string]string
+	Body    string
+}
+
+func (r Response) HeaderToString() string {
+	if len(r.Headers) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+
+	for k, v := range r.Headers {
+		sb.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+	}
+
+	return sb.String()
 }
 
 func (r Response) String() string {
-	return fmt.Sprintf("%s %d %s\r\n\r\n", r.HTTPVersion, r.StatusCode, r.ReasonPhrase)
+	return fmt.Sprintf("%s %d %s\r\n%s\r\n", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString())
 }
 
 func handleConnection(conn net.Conn) {
@@ -100,10 +116,7 @@ func handleConnection(conn net.Conn) {
 		},
 	}
 
-	if req.RequestURI != "/" {
-		r.StatusCode = 404
-		r.ReasonPhrase = "Not Found"
-	}
+	r.Headers = req.Headers
 
 	_, err = conn.Write([]byte(r.String()))
 	if err != nil {
