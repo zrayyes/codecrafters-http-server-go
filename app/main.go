@@ -1,10 +1,49 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
+
+// The Request-Line begins with a method token,
+// followed by the Request-URI and the protocol version, and ending with CRLF.
+// The elements are separated by SP characters.
+// No CR or LF is allowed except in the final CRLF sequence.
+// Request-Line = Method SP Request-URI SP HTTP-Version CRLF
+type RequestLine struct {
+	Method      string // TODO: Use consts later
+	RequestURI  string
+	HTTPVersion string
+}
+
+type Request struct {
+	RequestLine
+}
+
+func ParseRequest(reader *bufio.Reader) (*Request, error) {
+	out, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+
+	parts := strings.Split(out, " ")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid request line")
+	}
+
+	req := &Request{
+		RequestLine: RequestLine{
+			Method:      parts[0],
+			RequestURI:  parts[1],
+			HTTPVersion: parts[2],
+		},
+	}
+
+	return req, nil
+}
 
 // The first line of a Response message is the Status-Line,
 // consisting of the protocol version followed by a numeric status code and its associated textual phrase,
@@ -28,6 +67,12 @@ func (r Response) String() string {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
+	req, err := ParseRequest(bufio.NewReader(conn))
+	if err != nil {
+		fmt.Println("Error reading from connection: ", err.Error())
+		return
+	}
+
 	r := Response{
 		StatusLine: StatusLine{
 			HTTPVersion:  "HTTP/1.1",
@@ -36,7 +81,12 @@ func handleConnection(conn net.Conn) {
 		},
 	}
 
-	_, err := conn.Write([]byte(r.String()))
+	if req.RequestURI != "/" {
+		r.StatusCode = 404
+		r.ReasonPhrase = "Not Found"
+	}
+
+	_, err = conn.Write([]byte(r.String()))
 	if err != nil {
 		fmt.Println("Error writing to connection: ", err.Error())
 		return
