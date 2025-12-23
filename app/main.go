@@ -1,3 +1,5 @@
+// RFC 9112 - HTTP/1.1 - https://datatracker.ietf.org/doc/html/rfc9112
+
 package main
 
 import (
@@ -21,6 +23,8 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine
+	Headers map[string]string
+	Body    string
 }
 
 func ParseRequest(reader *bufio.Reader) (*Request, error) {
@@ -40,6 +44,21 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 			RequestURI:  parts[1],
 			HTTPVersion: parts[2],
 		},
+		Headers: make(map[string]string),
+	}
+
+	// Parse headers
+	for {
+		line, err := reader.ReadString('\n')
+		// CRLF that marks the end of the headers
+		if err != nil || line == "\r\n" {
+			break
+		}
+		// Split into at most n substrings
+		headerParts := strings.SplitN(strings.TrimSpace(line), ": ", 2)
+		if len(headerParts) == 2 {
+			req.Headers[headerParts[0]] = headerParts[1]
+		}
 	}
 
 	return req, nil
