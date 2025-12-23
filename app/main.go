@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // The Request-Line begins with a method token,
@@ -96,7 +98,7 @@ func (r Response) HeaderToString() string {
 }
 
 func (r Response) String() string {
-	return fmt.Sprintf("%s %d %s\r\n%s\r\n", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString())
+	return fmt.Sprintf("%s %d %s\r\n%s\r\n%s", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString(), r.Body)
 }
 
 func handleConnection(conn net.Conn) {
@@ -114,9 +116,16 @@ func handleConnection(conn net.Conn) {
 			StatusCode:   200,
 			ReasonPhrase: "OK",
 		},
+		Headers: make(map[string]string),
 	}
 
-	r.Headers = req.Headers
+	after, found := strings.CutPrefix(req.RequestURI, "/echo/")
+	if found {
+		r.Body = after
+		r.Headers["Content-Type"] = "text/plain"
+		r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(after))
+
+	}
 
 	_, err = conn.Write([]byte(r.String()))
 	if err != nil {
