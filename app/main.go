@@ -124,7 +124,11 @@ func handleConnection(conn net.Conn) {
 		r.Body = after
 		r.Headers["Content-Type"] = "text/plain"
 		r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(after))
-
+	} else {
+		if req.RequestURI != "/" {
+			r.StatusCode = 404
+			r.ReasonPhrase = "Not Found"
+		}
 	}
 
 	_, err = conn.Write([]byte(r.String()))
