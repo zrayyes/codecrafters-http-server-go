@@ -16,6 +16,21 @@ import (
 
 var FILE_DIRECTORY = "/tmp/"
 
+func handleEcho(req *Request, res *Response) {
+	value := strings.TrimPrefix(req.RequestURI, "/echo/")
+	res.Headers.Set("Content-Type", "text/plain")
+	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
+	res.Body = value
+}
+
+func handleUserAgent(req *Request, res *Response) {
+	if ua, found := req.Headers.Get("User-Agent"); found {
+		res.Headers.Set("Content-Type", "text/plain")
+		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
+		res.Body = ua
+	}
+}
+
 func handleFileReturn(req *Request, res *Response) {
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
@@ -64,17 +79,10 @@ func handleConnection(conn net.Conn) {
 		// Home - just return 200 OK
 
 	case req.RequestURI == "/user-agent":
-		if ua, found := req.Headers.Get("User-Agent"); found {
-			res.Headers.Set("Content-Type", "text/plain")
-			res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
-			res.Body = ua
-		}
+		handleUserAgent(req, res)
 
 	case strings.HasPrefix(req.RequestURI, "/echo/"):
-		value := strings.TrimPrefix(req.RequestURI, "/echo/")
-		res.Headers.Set("Content-Type", "text/plain")
-		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
-		res.Body = value
+		handleEcho(req, res)
 
 	case strings.HasPrefix(req.RequestURI, "/files/"):
 		handleFileReturn(req, res)
