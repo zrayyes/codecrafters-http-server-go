@@ -2,14 +2,38 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
+
+func handleFileReturn(req *Request, res *Response) {
+	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
+	filePath = filepath.Join("/tmp/", filePath)
+	dat, err := os.ReadFile(filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("File '%s' not found, need to create it\n", filePath)
+			res.StatusCode = 404
+			res.ReasonPhrase = "Not Found"
+		} else {
+			fmt.Printf("Error opening file: %v\n", err)
+			res.StatusCode = 500
+			res.ReasonPhrase = "Internal Server Error"
+		}
+		return
+	}
+
+	res.Headers.Set("Content-Type", "application/octet-stream")
+	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(string(dat))))
+	res.Body = string(dat)
+}
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
@@ -23,7 +47,7 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	r := Response{
+	res := &Response{
 		StatusLine: StatusLine{
 			HTTPVersion:  "HTTP/1.1",
 			StatusCode:   200,
@@ -38,23 +62,26 @@ func handleConnection(conn net.Conn) {
 
 	case req.RequestURI == "/user-agent":
 		if ua, found := req.Headers.Get("User-Agent"); found {
-			r.Headers.Set("Content-Type", "text/plain")
-			r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
-			r.Body = ua
+			res.Headers.Set("Content-Type", "text/plain")
+			res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
+			res.Body = ua
 		}
 
 	case strings.HasPrefix(req.RequestURI, "/echo/"):
 		value := strings.TrimPrefix(req.RequestURI, "/echo/")
-		r.Headers.Set("Content-Type", "text/plain")
-		r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
-		r.Body = value
+		res.Headers.Set("Content-Type", "text/plain")
+		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
+		res.Body = value
+
+	case strings.HasPrefix(req.RequestURI, "/files/"):
+		handleFileReturn(req, res)
 
 	default:
-		r.StatusCode = 404
-		r.ReasonPhrase = "Not Found"
+		res.StatusCode = 404
+		res.ReasonPhrase = "Not Found"
 	}
 
-	_, err = conn.Write([]byte(r.String()))
+	_, err = conn.Write([]byte(res.String()))
 	if err != nil {
 		fmt.Println("Error writing to connection: ", err.Error())
 		return
