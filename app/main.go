@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -13,9 +14,11 @@ import (
 	"unicode/utf8"
 )
 
+var FILE_DIRECTORY = "/tmp/"
+
 func handleFileReturn(req *Request, res *Response) {
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
-	filePath = filepath.Join("/tmp/", filePath)
+	filePath = filepath.Join(FILE_DIRECTORY, filePath)
 	dat, err := os.ReadFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -89,6 +92,12 @@ func handleConnection(conn net.Conn) {
 }
 
 func main() {
+	directory := flag.String("directory", "/tmp/", "Specifies the directory where the files are stored, as an absolute path.")
+
+	flag.Parse()
+
+	FILE_DIRECTORY = *directory
+
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
