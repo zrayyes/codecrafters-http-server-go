@@ -13,7 +13,25 @@ import (
 	"unicode/utf8"
 )
 
-// TODO: Add struct for headers that handles getting/storing to avoid lower/upper shenanigans
+// Headers is a case-insensitive map for HTTP headers.
+// Keys are normalized to lowercase internally.
+type Headers map[string]string
+
+// Get retrieves a header value by key (case-insensitive).
+func (h Headers) Get(key string) (string, bool) {
+	val, ok := h[strings.ToLower(key)]
+	return val, ok
+}
+
+// Set stores a header value with a key (case-insensitive).
+func (h Headers) Set(key, value string) {
+	h[strings.ToLower(key)] = value
+}
+
+// NewHeaders creates a new Headers map.
+func NewHeaders() Headers {
+	return make(Headers)
+}
 
 // The Request-Line begins with a method token,
 // followed by the Request-URI and the protocol version, and ending with CRLF.
@@ -28,7 +46,7 @@ type RequestLine struct {
 
 type Request struct {
 	RequestLine
-	Headers map[string]string
+	Headers Headers
 	Body    string
 }
 
@@ -49,7 +67,7 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 			RequestURI:  parts[1],
 			HTTPVersion: parts[2],
 		},
-		Headers: make(map[string]string),
+		Headers: NewHeaders(),
 	}
 
 	// Parse headers
@@ -62,7 +80,7 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 		// Split into at most n substrings
 		headerParts := strings.SplitN(strings.TrimSpace(line), ": ", 2)
 		if len(headerParts) == 2 {
-			req.Headers[strings.ToLower(headerParts[0])] = headerParts[1]
+			req.Headers.Set(headerParts[0], headerParts[1])
 		}
 	}
 
@@ -82,7 +100,7 @@ type StatusLine struct {
 
 type Response struct {
 	StatusLine
-	Headers map[string]string
+	Headers Headers
 	Body    string
 }
 
@@ -122,20 +140,20 @@ func handleConnection(conn net.Conn) {
 			StatusCode:   200,
 			ReasonPhrase: "OK",
 		},
-		Headers: make(map[string]string),
+		Headers: NewHeaders(),
 	}
 
 	after, found := strings.CutPrefix(req.RequestURI, "/echo/")
 	if found {
 		r.Body = after
-		r.Headers["Content-Type"] = "text/plain"
-		r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(after))
+		r.Headers.Set("Content-Type", "text/plain")
+		r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(after)))
 	} else {
 		if req.RequestURI == "/user-agent" {
-			userAgentHeaderValue, found := req.Headers["user-agent"]
+			userAgentHeaderValue, found := req.Headers.Get("User-Agent")
 			if found {
-				r.Headers["Content-Type"] = "text/plain"
-				r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(userAgentHeaderValue))
+				r.Headers.Set("Content-Type", "text/plain")
+				r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(userAgentHeaderValue)))
 				r.Body = userAgentHeaderValue
 			}
 		} else if req.RequestURI != "/" {
