@@ -5,12 +5,15 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
+
+// TODO: Add struct for headers that handles getting/storing to avoid lower/upper shenanigans
 
 // The Request-Line begins with a method token,
 // followed by the Request-URI and the protocol version, and ending with CRLF.
@@ -59,7 +62,7 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 		// Split into at most n substrings
 		headerParts := strings.SplitN(strings.TrimSpace(line), ": ", 2)
 		if len(headerParts) == 2 {
-			req.Headers[headerParts[0]] = headerParts[1]
+			req.Headers[strings.ToLower(headerParts[0])] = headerParts[1]
 		}
 	}
 
@@ -106,6 +109,9 @@ func handleConnection(conn net.Conn) {
 
 	req, err := ParseRequest(bufio.NewReader(conn))
 	if err != nil {
+		if err == io.EOF {
+			return
+		}
 		fmt.Println("Error reading from connection: ", err.Error())
 		return
 	}
@@ -125,7 +131,14 @@ func handleConnection(conn net.Conn) {
 		r.Headers["Content-Type"] = "text/plain"
 		r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(after))
 	} else {
-		if req.RequestURI != "/" {
+		if req.RequestURI == "/user-agent" {
+			userAgentHeaderValue, found := req.Headers["user-agent"]
+			if found {
+				r.Headers["Content-Type"] = "text/plain"
+				r.Headers["Content-Length"] = strconv.Itoa(utf8.RuneCountInString(userAgentHeaderValue))
+				r.Body = userAgentHeaderValue
+			}
+		} else if req.RequestURI != "/" {
 			r.StatusCode = 404
 			r.ReasonPhrase = "Not Found"
 		}
