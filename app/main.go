@@ -143,23 +143,26 @@ func handleConnection(conn net.Conn) {
 		Headers: NewHeaders(),
 	}
 
-	after, found := strings.CutPrefix(req.RequestURI, "/echo/")
-	if found {
-		r.Body = after
-		r.Headers.Set("Content-Type", "text/plain")
-		r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(after)))
-	} else {
-		if req.RequestURI == "/user-agent" {
-			userAgentHeaderValue, found := req.Headers.Get("User-Agent")
-			if found {
-				r.Headers.Set("Content-Type", "text/plain")
-				r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(userAgentHeaderValue)))
-				r.Body = userAgentHeaderValue
-			}
-		} else if req.RequestURI != "/" {
-			r.StatusCode = 404
-			r.ReasonPhrase = "Not Found"
+	switch {
+	case req.RequestURI == "/":
+		// Home - just return 200 OK
+
+	case req.RequestURI == "/user-agent":
+		if ua, found := req.Headers.Get("User-Agent"); found {
+			r.Headers.Set("Content-Type", "text/plain")
+			r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
+			r.Body = ua
 		}
+
+	case strings.HasPrefix(req.RequestURI, "/echo/"):
+		value := strings.TrimPrefix(req.RequestURI, "/echo/")
+		r.Headers.Set("Content-Type", "text/plain")
+		r.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
+		r.Body = value
+
+	default:
+		r.StatusCode = 404
+		r.ReasonPhrase = "Not Found"
 	}
 
 	_, err = conn.Write([]byte(r.String()))
