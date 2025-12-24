@@ -53,6 +53,21 @@ func handleFileReturn(req *Request, res *Response) {
 	res.Body = string(dat)
 }
 
+func handleFileCreate(req *Request, res *Response) {
+	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
+	filePath = filepath.Join(FILE_DIRECTORY, filePath)
+
+	err := os.WriteFile(filePath, []byte(req.Body), 0644)
+	if err != nil {
+		fmt.Printf("Error writing file: %v\n", err)
+		res.StatusCode = 500
+		res.ReasonPhrase = "Internal Server Error"
+	}
+
+	res.StatusCode = 201
+	res.ReasonPhrase = "Created"
+}
+
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
@@ -85,7 +100,11 @@ func handleConnection(conn net.Conn) {
 		handleEcho(req, res)
 
 	case strings.HasPrefix(req.RequestURI, "/files/"):
-		handleFileReturn(req, res)
+		if req.Method == "POST" {
+			handleFileCreate(req, res)
+		} else {
+			handleFileReturn(req, res)
+		}
 
 	default:
 		res.StatusCode = 404

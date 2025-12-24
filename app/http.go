@@ -5,6 +5,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 )
 
@@ -79,6 +81,21 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 		}
 	}
 
+	if n, found := req.Headers.Get("Content-Length"); found && n != "0" {
+		num, err := strconv.Atoi(n)
+		if err != nil {
+			return nil, err
+		}
+		buf := make([]byte, num)
+
+		_, err = io.ReadFull(reader, buf)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Body = string(buf)
+	}
+
 	return req, nil
 }
 
@@ -116,4 +133,3 @@ func (r Response) HeaderToString() string {
 func (r Response) String() string {
 	return fmt.Sprintf("%s %d %s\r\n%s\r\n%s", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString(), r.Body)
 }
-
