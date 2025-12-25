@@ -134,6 +134,18 @@ func (r Response) String() string {
 	return fmt.Sprintf("%s %d %s\r\n%s\r\n%s", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString(), r.Body)
 }
 
+// NewResponse creates a new Response with sensible defaults (HTTP/1.1 200 OK).
+func NewResponse() *Response {
+	return &Response{
+		StatusLine: StatusLine{
+			HTTPVersion:  "HTTP/1.1",
+			StatusCode:   200,
+			ReasonPhrase: "OK",
+		},
+		Headers: NewHeaders(),
+	}
+}
+
 type HandlerFunc func(req *Request) *Response
 
 type Route struct {
@@ -170,8 +182,8 @@ func (r *Router) Route(req *Request) *Response {
 			}
 		}
 	}
-	return &Response{
-		StatusLine: StatusLine{"HTTP/1.1", 404, "Not Found"},
-		Headers:    NewHeaders(),
-	}
+	res := NewResponse()
+	res.StatusCode = 404
+	res.ReasonPhrase = "Not Found"
+	return res
 }

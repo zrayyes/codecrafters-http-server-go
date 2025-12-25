@@ -17,37 +17,30 @@ import (
 var FILE_DIRECTORY = "/tmp/"
 
 func homeHandler(req *Request) *Response {
-	return &Response{
-		StatusLine: StatusLine{
-			HTTPVersion:  "HTTP/1.1",
-			StatusCode:   200,
-			ReasonPhrase: "OK",
-		},
-		Headers: NewHeaders(),
-	}
+	return NewResponse()
 }
 
 func echoHandler(req *Request) *Response {
-	res := Response{}
+	res := NewResponse()
 	value := strings.TrimPrefix(req.RequestURI, "/echo/")
 	res.Headers.Set("Content-Type", "text/plain")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
 	res.Body = value
-	return &res
+	return res
 }
 
 func userAgentHandler(req *Request) *Response {
-	res := Response{}
+	res := NewResponse()
 	if ua, found := req.Headers.Get("User-Agent"); found {
 		res.Headers.Set("Content-Type", "text/plain")
 		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
 		res.Body = ua
 	}
-	return &res
+	return res
 }
 
 func fileReturnHandler(req *Request) *Response {
-	res := Response{}
+	res := NewResponse()
 
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
@@ -62,18 +55,18 @@ func fileReturnHandler(req *Request) *Response {
 			res.StatusCode = 500
 			res.ReasonPhrase = "Internal Server Error"
 		}
-		return &res
+		return res
 	}
 
 	res.Headers.Set("Content-Type", "application/octet-stream")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(string(dat))))
 	res.Body = string(dat)
 
-	return &res
+	return res
 }
 
 func fileCreateHandler(req *Request) *Response {
-	res := Response{}
+	res := NewResponse()
 
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
@@ -83,13 +76,12 @@ func fileCreateHandler(req *Request) *Response {
 		fmt.Printf("Error writing file: %v\n", err)
 		res.StatusCode = 500
 		res.ReasonPhrase = "Internal Server Error"
-		return &res
-
+		return res
 	}
 
 	res.StatusCode = 201
 	res.ReasonPhrase = "Created"
-	return &res
+	return res
 }
 
 func fileHandler(req *Request) *Response {
