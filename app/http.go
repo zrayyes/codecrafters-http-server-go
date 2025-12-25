@@ -146,7 +146,7 @@ func NewResponse() *Response {
 	}
 }
 
-type HandlerFunc func(req *Request) *Response
+type HandlerFunc func(req *Request, res *Response)
 
 type Route struct {
 	Pattern  string
@@ -171,18 +171,22 @@ func (r *Router) HandlePrefix(prefix string, handler HandlerFunc) {
 }
 
 func (r *Router) Route(req *Request) *Response {
+	res := NewResponse()
+
 	for _, route := range r.routes {
 		if route.IsPrefix {
 			if strings.HasPrefix(req.RequestURI, route.Pattern) {
-				return route.Handler(req)
+				route.Handler(req, res)
+				return res
 			}
 		} else {
 			if req.RequestURI == route.Pattern {
-				return route.Handler(req)
+				route.Handler(req, res)
+				return res
 			}
 		}
 	}
-	res := NewResponse()
+
 	res.StatusCode = 404
 	res.ReasonPhrase = "Not Found"
 	return res

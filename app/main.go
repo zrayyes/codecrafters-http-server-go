@@ -16,32 +16,25 @@ import (
 
 var FILE_DIRECTORY = "/tmp/"
 
-func homeHandler(req *Request) *Response {
-	return NewResponse()
+func homeHandler(req *Request, res *Response) {
 }
 
-func echoHandler(req *Request) *Response {
-	res := NewResponse()
+func echoHandler(req *Request, res *Response) {
 	value := strings.TrimPrefix(req.RequestURI, "/echo/")
 	res.Headers.Set("Content-Type", "text/plain")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
 	res.Body = value
-	return res
 }
 
-func userAgentHandler(req *Request) *Response {
-	res := NewResponse()
+func userAgentHandler(req *Request, res *Response) {
 	if ua, found := req.Headers.Get("User-Agent"); found {
 		res.Headers.Set("Content-Type", "text/plain")
 		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
 		res.Body = ua
 	}
-	return res
 }
 
-func fileReturnHandler(req *Request) *Response {
-	res := NewResponse()
-
+func fileReturnHandler(req *Request, res *Response) {
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
 	dat, err := os.ReadFile(filePath)
@@ -55,19 +48,15 @@ func fileReturnHandler(req *Request) *Response {
 			res.StatusCode = 500
 			res.ReasonPhrase = "Internal Server Error"
 		}
-		return res
+		return
 	}
 
 	res.Headers.Set("Content-Type", "application/octet-stream")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(string(dat))))
 	res.Body = string(dat)
-
-	return res
 }
 
-func fileCreateHandler(req *Request) *Response {
-	res := NewResponse()
-
+func fileCreateHandler(req *Request, res *Response) {
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
 
@@ -76,19 +65,19 @@ func fileCreateHandler(req *Request) *Response {
 		fmt.Printf("Error writing file: %v\n", err)
 		res.StatusCode = 500
 		res.ReasonPhrase = "Internal Server Error"
-		return res
+		return
 	}
 
 	res.StatusCode = 201
 	res.ReasonPhrase = "Created"
-	return res
 }
 
-func fileHandler(req *Request) *Response {
+func fileHandler(req *Request, res *Response) {
 	if req.Method == "POST" {
-		return fileCreateHandler(req)
+		fileCreateHandler(req, res)
+		return
 	}
-	return fileReturnHandler(req)
+	fileReturnHandler(req, res)
 }
 
 func handleConnection(conn net.Conn, router *Router) {
