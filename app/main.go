@@ -16,22 +16,39 @@ import (
 
 var FILE_DIRECTORY = "/tmp/"
 
-func handleEcho(req *Request, res *Response) {
+func homeHandler(req *Request) *Response {
+	return &Response{
+		StatusLine: StatusLine{
+			HTTPVersion:  "HTTP/1.1",
+			StatusCode:   200,
+			ReasonPhrase: "OK",
+		},
+		Headers: NewHeaders(),
+	}
+}
+
+func echoHandler(req *Request) *Response {
+	res := Response{}
 	value := strings.TrimPrefix(req.RequestURI, "/echo/")
 	res.Headers.Set("Content-Type", "text/plain")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(value)))
 	res.Body = value
+	return &res
 }
 
-func handleUserAgent(req *Request, res *Response) {
+func userAgentHandler(req *Request) *Response {
+	res := Response{}
 	if ua, found := req.Headers.Get("User-Agent"); found {
 		res.Headers.Set("Content-Type", "text/plain")
 		res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(ua)))
 		res.Body = ua
 	}
+	return &res
 }
 
-func handleFileReturn(req *Request, res *Response) {
+func fileReturnHandler(req *Request) *Response {
+	res := Response{}
+
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
 	dat, err := os.ReadFile(filePath)
@@ -45,15 +62,19 @@ func handleFileReturn(req *Request, res *Response) {
 			res.StatusCode = 500
 			res.ReasonPhrase = "Internal Server Error"
 		}
-		return
+		return &res
 	}
 
 	res.Headers.Set("Content-Type", "application/octet-stream")
 	res.Headers.Set("Content-Length", strconv.Itoa(utf8.RuneCountInString(string(dat))))
 	res.Body = string(dat)
+
+	return &res
 }
 
-func handleFileCreate(req *Request, res *Response) {
+func fileCreateHandler(req *Request) *Response {
+	res := Response{}
+
 	filePath := strings.TrimPrefix(req.RequestURI, "/files/")
 	filePath = filepath.Join(FILE_DIRECTORY, filePath)
 
@@ -62,13 +83,23 @@ func handleFileCreate(req *Request, res *Response) {
 		fmt.Printf("Error writing file: %v\n", err)
 		res.StatusCode = 500
 		res.ReasonPhrase = "Internal Server Error"
+		return &res
+
 	}
 
 	res.StatusCode = 201
 	res.ReasonPhrase = "Created"
+	return &res
 }
 
-func handleConnection(conn net.Conn) {
+func fileHandler(req *Request) *Response {
+	if req.Method == "POST" {
+		return fileCreateHandler(req)
+	}
+	return fileReturnHandler(req)
+}
+
+func handleConnection(conn net.Conn, router *Router) {
 	defer conn.Close()
 
 	req, err := ParseRequest(bufio.NewReader(conn))
@@ -80,36 +111,7 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	res := &Response{
-		StatusLine: StatusLine{
-			HTTPVersion:  "HTTP/1.1",
-			StatusCode:   200,
-			ReasonPhrase: "OK",
-		},
-		Headers: NewHeaders(),
-	}
-
-	switch {
-	case req.RequestURI == "/":
-		// Home - just return 200 OK
-
-	case req.RequestURI == "/user-agent":
-		handleUserAgent(req, res)
-
-	case strings.HasPrefix(req.RequestURI, "/echo/"):
-		handleEcho(req, res)
-
-	case strings.HasPrefix(req.RequestURI, "/files/"):
-		if req.Method == "POST" {
-			handleFileCreate(req, res)
-		} else {
-			handleFileReturn(req, res)
-		}
-
-	default:
-		res.StatusCode = 404
-		res.ReasonPhrase = "Not Found"
-	}
+	res := router.Route(req)
 
 	_, err = conn.Write([]byte(res.String()))
 	if err != nil {
@@ -131,12 +133,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	router := &Router{}
+
+	router.HandleExact("/", homeHandler)
+	router.HandleExact("/user-agent", userAgentHandler)
+	router.HandlePrefix("/echo/", echoHandler)
+	router.HandlePrefix("/files/", fileHandler)
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, router)
 	}
 }

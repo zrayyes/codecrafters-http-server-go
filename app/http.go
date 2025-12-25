@@ -133,3 +133,45 @@ func (r Response) HeaderToString() string {
 func (r Response) String() string {
 	return fmt.Sprintf("%s %d %s\r\n%s\r\n%s", r.HTTPVersion, r.StatusCode, r.ReasonPhrase, r.HeaderToString(), r.Body)
 }
+
+type HandlerFunc func(req *Request) *Response
+
+type Route struct {
+	Pattern  string
+	IsPrefix bool
+	Handler  HandlerFunc
+}
+
+type Router struct {
+	routes []Route
+}
+
+func NewRouter() Router {
+	return Router{}
+}
+
+func (r *Router) HandleExact(path string, handler HandlerFunc) {
+	r.routes = append(r.routes, Route{path, false, handler})
+}
+
+func (r *Router) HandlePrefix(prefix string, handler HandlerFunc) {
+	r.routes = append(r.routes, Route{prefix, true, handler})
+}
+
+func (r *Router) Route(req *Request) *Response {
+	for _, route := range r.routes {
+		if route.IsPrefix {
+			if strings.HasPrefix(req.RequestURI, route.Pattern) {
+				return route.Handler(req)
+			}
+		} else {
+			if req.RequestURI == route.Pattern {
+				return route.Handler(req)
+			}
+		}
+	}
+	return &Response{
+		StatusLine: StatusLine{"HTTP/1.1", 404, "Not Found"},
+		Headers:    NewHeaders(),
+	}
+}
