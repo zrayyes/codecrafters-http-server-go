@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -190,4 +191,36 @@ func (r *Router) Route(req *Request) *Response {
 	res.StatusCode = 404
 	res.ReasonPhrase = "Not Found"
 	return res
+}
+
+func (r Router) handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	req, err := ParseRequest(bufio.NewReader(conn))
+	if err != nil {
+		if err == io.EOF {
+			return
+		}
+		fmt.Println("Error reading from connection: ", err.Error())
+		return
+	}
+
+	res := r.Route(req)
+
+	_, err = conn.Write([]byte(res.String()))
+	if err != nil {
+		fmt.Println("Error writing to connection: ", err.Error())
+		return
+	}
+}
+
+func (r Router) start(l net.Listener) error {
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			return err
+		}
+		go r.handleConnection(conn)
+	}
 }

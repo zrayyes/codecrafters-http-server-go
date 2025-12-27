@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -80,27 +78,6 @@ func fileHandler(req *Request, res *Response) {
 	fileReturnHandler(req, res)
 }
 
-func handleConnection(conn net.Conn, router *Router) {
-	defer conn.Close()
-
-	req, err := ParseRequest(bufio.NewReader(conn))
-	if err != nil {
-		if err == io.EOF {
-			return
-		}
-		fmt.Println("Error reading from connection: ", err.Error())
-		return
-	}
-
-	res := router.Route(req)
-
-	_, err = conn.Write([]byte(res.String()))
-	if err != nil {
-		fmt.Println("Error writing to connection: ", err.Error())
-		return
-	}
-}
-
 func main() {
 	directory := flag.String("directory", "/tmp/", "Specifies the directory where the files are stored, as an absolute path.")
 
@@ -121,12 +98,8 @@ func main() {
 	router.HandlePrefix("/echo/", echoHandler)
 	router.HandlePrefix("/files/", fileHandler)
 
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
-		go handleConnection(conn, router)
+	err = router.start(l)
+	if err != nil {
+		os.Exit(1)
 	}
 }
