@@ -14,6 +14,21 @@ import (
 
 var FILE_DIRECTORY = "/tmp/"
 
+func encodingMiddleware(req *Request, res *Response) {
+	acceptEncoding, found := req.Headers.Get("Accept-Encoding")
+	if !found {
+		return
+	}
+
+	encodings := strings.Split(acceptEncoding, ",")
+	for _, encoding := range encodings {
+		if strings.TrimSpace(encoding) == "gzip" {
+			res.Headers.Set("Content-Encoding", "gzip")
+			return
+		}
+	}
+}
+
 func homeHandler(req *Request, res *Response) {
 }
 
@@ -97,6 +112,9 @@ func main() {
 	router.HandleExact("/user-agent", userAgentHandler)
 	router.HandlePrefix("/echo/", echoHandler)
 	router.HandlePrefix("/files/", fileHandler)
+
+	// Middleware that runs after handlers
+	router.Add(encodingMiddleware)
 
 	err = router.start(l)
 	if err != nil {
