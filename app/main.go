@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,13 +22,31 @@ func encodingMiddleware(req *Request, res *Response) {
 		return
 	}
 
+	supportsGzip := false
 	encodings := strings.Split(acceptEncoding, ",")
 	for _, encoding := range encodings {
 		if strings.TrimSpace(encoding) == "gzip" {
-			res.Headers.Set("Content-Encoding", "gzip")
-			return
+			supportsGzip = true
+			break
 		}
 	}
+
+	if !supportsGzip || res.Body == "" {
+		return
+	}
+
+	// Compress the body with gzip
+	var buf bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buf)
+	_, err := gzipWriter.Write([]byte(res.Body))
+	if err != nil {
+		return
+	}
+	gzipWriter.Close()
+
+	res.Body = buf.String()
+	res.Headers.Set("Content-Encoding", "gzip")
+	res.Headers.Set("Content-Length", strconv.Itoa(buf.Len()))
 }
 
 func homeHandler(req *Request, res *Response) {
