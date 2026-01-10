@@ -149,47 +149,85 @@ func NewResponse() *Response {
 
 type HandlerFunc func(req *Request, res *Response)
 
-type Route struct {
-	Pattern  string
-	IsPrefix bool
-	Handler  HandlerFunc
+type entryKind int
+
+const (
+	kindMiddleware entryKind = iota
+	kindRoute
+)
+
+type entry struct {
+	kind     entryKind
+	pattern  string
+	isPrefix bool
+	handler  HandlerFunc
 }
 
 type Router struct {
-	routes []Route
+	entries []entry
 }
 
 func NewRouter() Router {
 	return Router{}
 }
 
+func (r *Router) Add(handler HandlerFunc) {
+	r.entries = append(r.entries, entry{
+		kind:    kindMiddleware,
+		handler: handler,
+	})
+}
+
 func (r *Router) HandleExact(path string, handler HandlerFunc) {
-	r.routes = append(r.routes, Route{path, false, handler})
+	r.entries = append(r.entries, entry{
+		kind:    kindRoute,
+		pattern: path,
+		handler: handler,
+	})
 }
 
 func (r *Router) HandlePrefix(prefix string, handler HandlerFunc) {
-	r.routes = append(r.routes, Route{prefix, true, handler})
+	r.entries = append(r.entries, entry{
+		kind:     kindRoute,
+		pattern:  prefix,
+		isPrefix: true,
+		handler:  handler,
+	})
 }
 
 func (r *Router) Route(req *Request) *Response {
 	res := NewResponse()
+	handled := false
 
-	for _, route := range r.routes {
-		if route.IsPrefix {
-			if strings.HasPrefix(req.RequestURI, route.Pattern) {
-				route.Handler(req, res)
-				return res
+	for _, e := range r.entries {
+		switch e.kind {
+		case kindMiddleware:
+			// Middleware always runs
+			e.handler(req, res)
+
+		case kindRoute:
+			// Routes only run if not yet handled and pattern matches
+			if handled {
+				continue
 			}
-		} else {
-			if req.RequestURI == route.Pattern {
-				route.Handler(req, res)
-				return res
+			matched := false
+			if e.isPrefix {
+				matched = strings.HasPrefix(req.RequestURI, e.pattern)
+			} else {
+				matched = req.RequestURI == e.pattern
+			}
+			if matched {
+				e.handler(req, res)
+				handled = true
 			}
 		}
 	}
 
-	res.StatusCode = 404
-	res.ReasonPhrase = "Not Found"
+	if !handled {
+		res.StatusCode = 404
+		res.ReasonPhrase = "Not Found"
+	}
+
 	return res
 }
 
