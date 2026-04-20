@@ -63,7 +63,7 @@ func ParseRequest(reader *bufio.Reader) (*Request, error) {
 		RequestLine: RequestLine{
 			Method:      parts[0],
 			RequestURI:  parts[1],
-			HTTPVersion: parts[2],
+			HTTPVersion: strings.TrimSpace(parts[2]),
 		},
 		Headers: NewHeaders(),
 	}
@@ -232,31 +232,30 @@ func (r *Router) Route(req *Request) *Response {
 }
 
 func (r Router) handleConnection(conn net.Conn) {
+	defer conn.Close()
 
-	req, err := ParseRequest(bufio.NewReader(conn))
-	if err != nil {
-		if err == io.EOF {
+	reader := bufio.NewReader(conn)
+
+	for {
+		req, err := ParseRequest(reader)
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			fmt.Println("Error reading from connection: ", err.Error())
 			return
 		}
-		fmt.Println("Error reading from connection: ", err.Error())
-		return
-	}
 
-	c, found := req.Headers.Get("Connection")
-	if found && c == "close" {
-		defer conn.Close()
 		res := r.Route(req)
 		_, err = conn.Write([]byte(res.String()))
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
+			return
 		}
-		return
-	}
 
-	res := r.Route(req)
-	_, err = conn.Write([]byte(res.String()))
-	if err != nil {
-		fmt.Println("Error writing to connection: ", err.Error())
+		if c, found := req.Headers.Get("Connection"); found && strings.EqualFold(strings.TrimSpace(c), "close") {
+			return
+		}
 	}
 }
 
