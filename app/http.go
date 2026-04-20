@@ -247,14 +247,19 @@ func (r Router) handleConnection(conn net.Conn) {
 		}
 
 		res := r.Route(req)
+		closeAfter := false
+		if c, found := req.Headers.Get("Connection"); found && strings.EqualFold(strings.TrimSpace(c), "close") {
+			res.Headers.Set("Connection", "close")
+			closeAfter = true
+		}
+
 		_, err = conn.Write([]byte(res.String()))
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
 			return
 		}
 
-		if c, found := req.Headers.Get("Connection"); found && strings.EqualFold(strings.TrimSpace(c), "close") {
-			res.Headers.Set("Connection", "close")
+		if closeAfter {
 			return
 		}
 	}
