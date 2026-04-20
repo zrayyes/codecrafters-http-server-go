@@ -232,7 +232,6 @@ func (r *Router) Route(req *Request) *Response {
 }
 
 func (r Router) handleConnection(conn net.Conn) {
-	defer conn.Close()
 
 	req, err := ParseRequest(bufio.NewReader(conn))
 	if err != nil {
@@ -243,12 +242,17 @@ func (r Router) handleConnection(conn net.Conn) {
 		return
 	}
 
-	res := r.Route(req)
+	c, found := req.Headers.Get("Connection")
+	if found && c == "close" {
+		defer conn.Close()
+	} else {
+		res := r.Route(req)
 
-	_, err = conn.Write([]byte(res.String()))
-	if err != nil {
-		fmt.Println("Error writing to connection: ", err.Error())
-		return
+		_, err = conn.Write([]byte(res.String()))
+		if err != nil {
+			fmt.Println("Error writing to connection: ", err.Error())
+			return
+		}
 	}
 }
 
