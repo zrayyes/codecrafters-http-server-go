@@ -254,6 +254,7 @@ func (r Router) handleConnection(conn net.Conn) {
 		}
 
 		if c, found := req.Headers.Get("Connection"); found && strings.EqualFold(strings.TrimSpace(c), "close") {
+			res.Headers.Set("Connection", "close")
 			return
 		}
 	}
