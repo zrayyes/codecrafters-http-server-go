@@ -245,14 +245,18 @@ func (r Router) handleConnection(conn net.Conn) {
 	c, found := req.Headers.Get("Connection")
 	if found && c == "close" {
 		defer conn.Close()
-	} else {
 		res := r.Route(req)
-
 		_, err = conn.Write([]byte(res.String()))
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
-			return
 		}
+		return
+	}
+
+	res := r.Route(req)
+	_, err = conn.Write([]byte(res.String()))
+	if err != nil {
+		fmt.Println("Error writing to connection: ", err.Error())
 	}
 }
 
